@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
@@ -142,6 +143,8 @@ func (store *VaultStore) DeleteAll(path string) error {
 		return store.makeError("deleteAll", path, err)
 	}
 
+	fmt.Println("keysToDel", keysToDel)
+
 	if len(keysToDel) < 1 {
 		return fmt.Errorf("can't find keys to delete: %s", path)
 	}
@@ -185,9 +188,14 @@ func (store *VaultStore) listRecurse(path string, depth int) ([]string, error) {
 		return nil, store.makeError("listRecurse", path, err)
 	}
 
+	if len(keys) > 0 && !isDirectory(path) {
+		path = fmt.Sprintf("%s/", path)
+	}
+
 	// create a new string array to hold flattened keys
 	flatKeys := make([]string, 0)
 	for _, k := range keys {
+
 		fullKey := fmt.Sprintf("%s%s", path, k)
 
 		if !isDirectory(k) {
@@ -221,13 +229,17 @@ func (store *VaultStore) list(path string) ([]string, error) {
 	if len(secret.Data) == 0 {
 		path = vaultPath.ReplaceAllString(path, `$1/metadata/$2`)
 	}
+
 	secret, err = store.VaultClient.Logical().List(path)
 	if err != nil {
 		return nil, store.makeError("list", path, err)
 	}
+
+	// it's not a folder and we can't list it
 	if secret == nil {
-		return make([]string, 0), nil
+		return []string{""}, nil
 	}
+
 	if secret.Data["keys"] == nil {
 		return make([]string, 0), nil
 	}
@@ -238,6 +250,16 @@ func (store *VaultStore) list(path string) ([]string, error) {
 
 func isDirectory(key string) bool {
 	return strings.HasSuffix(key, "/")
+}
+
+func extractKey(path string) string {
+
+	if path == "" {
+		return ""
+	}
+
+	_, key := filepath.Split(path)
+	return key
 }
 
 func dataAsList(data interface{}) ([]string, error) {
