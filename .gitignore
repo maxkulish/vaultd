@@ -1,2 +1,4 @@
 vaultd
 */vaultd
+*.tar.gz
+bin/
